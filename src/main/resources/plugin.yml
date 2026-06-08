@@ -1,0 +1,11 @@
+name: BlueMapCompass
+version: '${version}'
+main: fun.mntale.blueMapCompass.BlueMapCompass
+api-version: '1.21'
+authors: [ MidnightTale_ ]
+website: https://mntale.fun
+depend: [BlueMap]
+permissions:
+  bluemapcompass.use:
+    description: Allows players to use the BlueMap compass GUI
+    default: true

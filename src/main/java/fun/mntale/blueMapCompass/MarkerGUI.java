@@ -1,12 +1,10 @@
 package fun.mntale.blueMapCompass;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
+import org.bukkit.ChatColor;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -23,8 +21,7 @@ import java.util.stream.Collectors;
  * Modern, clean, and extensible implementation using Adventure API and best practices.
  */
 public class MarkerGUI implements Listener {
-    private static final MiniMessage MM = MiniMessage.miniMessage();
-    private static final String GUI_TITLE_RAW = "<gold>BlueMap Markers";
+    private static final String GUI_TITLE_RAW = ChatColor.GOLD + "BlueMap Markers";
     private static final int INVENTORY_SIZE = 54;
     private static final int PAGE_SIZE = 45;
     private static final int SLOT_CATEGORY = 45;
@@ -123,10 +120,10 @@ public class MarkerGUI implements Listener {
         List<MarkerData> groupMarkers = allMarkers.stream().filter(m -> m.groupId().equals(groupId)).toList();
         int start = state.page() * PAGE_SIZE;
         int end = Math.min(start + PAGE_SIZE, groupMarkers.size());
-        String titleRaw = GUI_TITLE_RAW + " <gray>- <yellow>" + groupId;
-        Inventory gui = Bukkit.createInventory(null, INVENTORY_SIZE, MM.deserialize(titleRaw));
+        String titleRaw = GUI_TITLE_RAW + ChatColor.GRAY + " - " + ChatColor.YELLOW + groupId;
+        Inventory gui = Bukkit.createInventory(null, INVENTORY_SIZE, titleRaw);
         if (groupMarkers.isEmpty()) {
-            gui.setItem(22, createButton(Material.BARRIER, MM.deserialize("<red>No markers in this category.")));
+            gui.setItem(22, createButton(Material.BARRIER, ChatColor.RED + "No markers in this category."));
         } else {
             for (int i = start; i < end; i++) {
                 MarkerData marker = groupMarkers.get(i);
@@ -137,13 +134,13 @@ public class MarkerGUI implements Listener {
             gui.setItem(SLOT_CATEGORY, createCategoryButton(state));
         }
         if (state.page() > 0) {
-            gui.setItem(SLOT_PREV, createButton(Material.ARROW, MM.deserialize("<green>Previous Page")));
+            gui.setItem(SLOT_PREV, createButton(Material.ARROW, ChatColor.GREEN + "Previous Page"));
         }
         if (end < groupMarkers.size()) {
-            gui.setItem(SLOT_NEXT, createButton(Material.ARROW, MM.deserialize("<green>Next Page")));
+            gui.setItem(SLOT_NEXT, createButton(Material.ARROW, ChatColor.GREEN + "Next Page"));
         }
-        gui.setItem(SLOT_UNTRACK, createButton(Material.BARRIER, MM.deserialize("<red>Untrack All")));
-        gui.setItem(SLOT_CLOSE, createButton(Material.BARRIER, MM.deserialize("<red>Close")));
+        gui.setItem(SLOT_UNTRACK, createButton(Material.BARRIER, ChatColor.RED + "Untrack All"));
+        gui.setItem(SLOT_CLOSE, createButton(Material.BARRIER, ChatColor.RED + "Close"));
         player.openInventory(gui);
     }
 
@@ -151,16 +148,16 @@ public class MarkerGUI implements Listener {
         Material icon = getMarkerIcon(marker.type(), marker);
         Set<String> tracked = WaypointManager.getTrackedMarkers(player);
         boolean isTracked = tracked.contains(marker.id());
-        Component displayName;
+        String displayName;
         if (marker.groupId().equalsIgnoreCase("banner-markers")) {
             String colorName = marker.color() != null ? marker.color().toLowerCase() : "white";
             String hex = BANNER_TO_HEX.getOrDefault(colorName, "#FFFFFF");
-            String colorTag = colorName.length() > 0 ? "<color:" + hex + ">" : "";
-            displayName = MM.deserialize(colorTag + "<b>" + marker.name() + "</b>");
+            net.md_5.bungee.api.ChatColor color = net.md_5.bungee.api.ChatColor.of(hex);
+            displayName = color + "" + ChatColor.BOLD + marker.name();
         } else {
-            displayName = MM.deserialize("<gradient:#00c3ff:#ffff1c><b>" + marker.name() + "</b></gradient>");
+            displayName = net.md_5.bungee.api.ChatColor.of("#00c3ff") + "" + ChatColor.BOLD + marker.name();
         }
-        List<Component> lore = new ArrayList<>();
+        List<String> lore = new ArrayList<>();
         String worldName = marker.world();
         if (worldName.contains("#")) worldName = worldName.substring(0, worldName.indexOf('#'));
         boolean sameWorld = player.getWorld().getName().equals(worldName);
@@ -172,11 +169,11 @@ public class MarkerGUI implements Listener {
         if (sameWorld) {
             locLine += " (" + Math.round(distance) + "m)";
         }
-        lore.add(MM.deserialize("<gray>" + locLine + "</gray>"));
+        lore.add(ChatColor.GRAY + locLine);
         String owner = marker.placedBy() != null && !marker.placedBy().isEmpty() ? marker.placedBy() : "Unknown";
-        lore.add(MM.deserialize("<gray>Owner: <white>" + owner + "</white>"));
-        String status = isTracked ? "<green>Waypoint: Show" : "<gray>Status: Hide";
-        lore.add(MM.deserialize(status));
+        lore.add(ChatColor.GRAY + "Owner: " + ChatColor.WHITE + owner);
+        String status = isTracked ? ChatColor.GREEN + "Waypoint: Show" : ChatColor.GRAY + "Status: Hide";
+        lore.add(status);
         ItemStack item = createButton(icon, displayName, lore);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
@@ -200,34 +197,34 @@ public class MarkerGUI implements Listener {
         };
     }
 
-    private static ItemStack createButton(Material material, Component name) {
+    private static ItemStack createButton(Material material, String name) {
         return createButton(material, name, List.of());
     }
 
-    private static ItemStack createButton(Material material, Component name, List<Component> lore) {
+    private static ItemStack createButton(Material material, String name, List<String> lore) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(name);
-            if (!lore.isEmpty()) meta.lore(lore);
+            meta.setDisplayName(name);
+            if (!lore.isEmpty()) meta.setLore(lore);
             item.setItemMeta(meta);
         }
         return item;
     }
 
     private static ItemStack createCategoryButton(GuiState state) {
-        List<Component> lore = new ArrayList<>();
+        List<String> lore = new ArrayList<>();
         for (int i = 0; i < state.groupIds().size(); i++) {
             String name = state.groupIds().get(i);
             if (i == state.groupIndex()) {
-                lore.add(MM.deserialize("<green>> " + name));
+                lore.add(ChatColor.GREEN + "> " + name);
             } else {
-                lore.add(MM.deserialize("<gray>" + name));
+                lore.add(ChatColor.GRAY + name);
             }
         }
-        lore.add(Component.empty());
-        lore.add(MM.deserialize("<gray>Left: Next, Right: Previous"));
-        return createButton(CATEGORY_ICON, MM.deserialize("<aqua>Category: <yellow>" + state.groupIds().get(state.groupIndex())), lore);
+        lore.add("");
+        lore.add(ChatColor.GRAY + "Left: Next, Right: Previous");
+        return createButton(CATEGORY_ICON, ChatColor.AQUA + "Category: " + ChatColor.YELLOW + state.groupIds().get(state.groupIndex()), lore);
     }
 
     private static List<MarkerData> getBlueMapMarkers() {
@@ -243,15 +240,15 @@ public class MarkerGUI implements Listener {
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || clicked.getType() == Material.AIR) return;
         ItemMeta meta = clicked.getItemMeta();
-        Component displayName = meta != null ? meta.displayName() : null;
+        String displayName = meta != null ? meta.getDisplayName() : null;
         List<MarkerData> markers = getBlueMapMarkers();
         List<String> groupIds = markers.stream().map(MarkerData::groupId).distinct().collect(Collectors.toList());
         if (groupIds.isEmpty()) groupIds = List.of("banner-markers");
         GuiState state = getPlayerGuiState(player, groupIds);
         if (clicked.getType() == Material.BARRIER) {
-            if (displayName != null && PlainTextComponentSerializer.plainText().serialize(displayName).equalsIgnoreCase("Untrack All")) {
+            if (displayName != null && ChatColor.stripColor(displayName).equalsIgnoreCase("Untrack All")) {
                 WaypointManager.removeAllWaypoints(player);
-                player.sendMessage(MM.deserialize("<gray>All waypoints untracked."));
+                player.sendMessage(ChatColor.GRAY + "All waypoints untracked.");
                 player.closeInventory();
                 return;
             }
@@ -259,7 +256,7 @@ public class MarkerGUI implements Listener {
             return;
         }
         if (clicked.getType() == CATEGORY_ICON && displayName != null) {
-            String plain = PlainTextComponentSerializer.plainText().serialize(displayName);
+            String plain = ChatColor.stripColor(displayName);
             if (plain.startsWith("Category:")) {
                 boolean rightClick = event.isRightClick();
                 boolean leftClick = event.isLeftClick();
@@ -275,13 +272,13 @@ public class MarkerGUI implements Listener {
                 return;
             }
         }
-        if (clicked.getType() == Material.ARROW && displayName != null && displayName.equals(MM.deserialize("<green>Previous Page"))) {
+        if (clicked.getType() == Material.ARROW && displayName != null && ChatColor.stripColor(displayName).equals("Previous Page")) {
             GuiState newState = state.withPage(Math.max(0, state.page() - 1));
             savePlayerGuiState(player, newState);
             showPage(player, newState);
             return;
         }
-        if (clicked.getType() == Material.ARROW && displayName != null && displayName.equals(MM.deserialize("<green>Next Page"))) {
+        if (clicked.getType() == Material.ARROW && displayName != null && ChatColor.stripColor(displayName).equals("Next Page")) {
             GuiState newState = state.withPage(state.page() + 1);
             savePlayerGuiState(player, newState);
             showPage(player, newState);
@@ -296,16 +293,16 @@ public class MarkerGUI implements Listener {
                     if (fun.mntale.blueMapCompass.BlueMapCompass.debug) {
                         Bukkit.getLogger().warning("[BlueMapCompass] Marker not found for ID: " + markerId + " (Player: " + player.getName() + ")");
                     }
-                    player.sendMessage(MM.deserialize("<red>Marker not found!"));
+                    player.sendMessage(ChatColor.RED + "Marker not found!");
                     return;
                 }
                 Set<String> tracked = WaypointManager.getTrackedMarkers(player);
                 if (tracked.contains(markerId)) {
                     WaypointManager.removeWaypoint(player, markerId);
-                    player.sendMessage(MM.deserialize("<gray>Waypoint untracked."));
+                    player.sendMessage(ChatColor.GRAY + "Waypoint untracked.");
                 } else {
                     WaypointManager.addTrackedWaypoint(player, marker, fun.mntale.blueMapCompass.BlueMapCompass.instance);
-                    player.sendMessage(MM.deserialize("<green>Waypoint tracked!"));
+                    player.sendMessage(ChatColor.GREEN + "Waypoint tracked!");
                 }
                 openFor(player);
                 return;

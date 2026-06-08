@@ -15,13 +15,8 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.TextDisplay;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.DyeColor;
-import net.kyori.adventure.text.format.TextColor;
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
-import com.tcoded.folialib.wrapper.task.WrappedTask;
+import org.bukkit.ChatColor;
 
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,24 +33,24 @@ public class WaypointManager {
     public static final NamespacedKey DISPLAY_PLAYER_KEY = new NamespacedKey("bluemapcompass", "display_player");
     public static final NamespacedKey DISPLAY_MARKER_KEY = new NamespacedKey("bluemapcompass", "display_marker");
 
-    // Helper to map DyeColor to NamedTextColor
-    private static final Map<String, NamedTextColor> DYE_TO_NAMED = Map.ofEntries(
-        Map.entry("WHITE", NamedTextColor.WHITE),
-        Map.entry("ORANGE", NamedTextColor.GOLD),
-        Map.entry("MAGENTA", NamedTextColor.LIGHT_PURPLE),
-        Map.entry("LIGHT_BLUE", NamedTextColor.AQUA),
-        Map.entry("YELLOW", NamedTextColor.YELLOW),
-        Map.entry("LIME", NamedTextColor.GREEN),
-        Map.entry("PINK", NamedTextColor.LIGHT_PURPLE),
-        Map.entry("GRAY", NamedTextColor.GRAY),
-        Map.entry("LIGHT_GRAY", NamedTextColor.WHITE),
-        Map.entry("CYAN", NamedTextColor.DARK_AQUA),
-        Map.entry("PURPLE", NamedTextColor.DARK_PURPLE),
-        Map.entry("BLUE", NamedTextColor.BLUE),
-        Map.entry("BROWN", NamedTextColor.GOLD),
-        Map.entry("GREEN", NamedTextColor.DARK_GREEN),
-        Map.entry("RED", NamedTextColor.RED),
-        Map.entry("BLACK", NamedTextColor.BLACK)
+    // Helper to map DyeColor to ChatColor
+    private static final Map<String, ChatColor> DYE_TO_NAMED = Map.ofEntries(
+        Map.entry("WHITE", ChatColor.WHITE),
+        Map.entry("ORANGE", ChatColor.GOLD),
+        Map.entry("MAGENTA", ChatColor.LIGHT_PURPLE),
+        Map.entry("LIGHT_BLUE", ChatColor.AQUA),
+        Map.entry("YELLOW", ChatColor.YELLOW),
+        Map.entry("LIME", ChatColor.GREEN),
+        Map.entry("PINK", ChatColor.LIGHT_PURPLE),
+        Map.entry("GRAY", ChatColor.DARK_GRAY),
+        Map.entry("LIGHT_GRAY", ChatColor.GRAY),
+        Map.entry("CYAN", ChatColor.DARK_AQUA),
+        Map.entry("PURPLE", ChatColor.DARK_PURPLE),
+        Map.entry("BLUE", ChatColor.BLUE),
+        Map.entry("BROWN", ChatColor.GOLD),
+        Map.entry("GREEN", ChatColor.DARK_GREEN),
+        Map.entry("RED", ChatColor.RED),
+        Map.entry("BLACK", ChatColor.BLACK)
     );
 
     // Add the BANNER_TO_HEX map (copy from MarkerGUI):
@@ -79,11 +74,11 @@ public class WaypointManager {
     );
 
     // Global task for updating all waypoints
-    private static WrappedTask globalTask;
+    private static BukkitTask globalTask;
 
     public static void startGlobalWaypointTask(JavaPlugin plugin) {
         stopGlobalWaypointTask();
-        globalTask = BlueMapCompass.foliaLib.getImpl().runTimer(() -> updateAllWaypoints(plugin), 1L, 2L);
+        globalTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> updateAllWaypoints(plugin), 1L, 2L);
     }
 
     public static void stopGlobalWaypointTask() {
@@ -137,57 +132,55 @@ public class WaypointManager {
                 if (!player.isOnline() || player.getWorld() == null) {
                     return;
                 }
-                // Spawn new BlockDisplay and TextDisplay using FoliaLib scheduler at player entity
-                BlueMapCompass.foliaLib.getScheduler().runAtEntity(player, (spawnTask) -> {
-                    Material spawnedBlockMaterial = Material.GREEN_STAINED_GLASS;
-                    if (marker.groupId().equalsIgnoreCase("banner-markers")) {
-                        String colorName = marker.color() != null ? marker.color().toUpperCase() : "GREEN";
-                        try {
-                            spawnedBlockMaterial = Material.valueOf(colorName + "_STAINED_GLASS");
-                        } catch (Exception ignored) {
-                            spawnedBlockMaterial = Material.GREEN_STAINED_GLASS;
-                        }
+                // Spawn new BlockDisplay and TextDisplay
+                Material spawnedBlockMaterial = Material.GREEN_STAINED_GLASS;
+                if (marker.groupId().equalsIgnoreCase("banner-markers")) {
+                    String colorName = marker.color() != null ? marker.color().toUpperCase() : "GREEN";
+                    try {
+                        spawnedBlockMaterial = Material.valueOf(colorName + "_STAINED_GLASS");
+                    } catch (Exception ignored) {
+                        spawnedBlockMaterial = Material.GREEN_STAINED_GLASS;
                     }
-                    BlockDisplay spawnedDisplay = (BlockDisplay) player.getWorld().spawnEntity(getBillboardLocation(player, target, 48), EntityType.BLOCK_DISPLAY);
-                    spawnedDisplay.setBlock(Bukkit.createBlockData(spawnedBlockMaterial));
-                    spawnedDisplay.setBrightness(new Display.Brightness(15, 15));
-                    Transformation spawnedT = spawnedDisplay.getTransformation();
-                    spawnedT.getScale().set(0.15f, (float) (500 - (-64)), 0.15f);
-                    spawnedDisplay.setTransformation(spawnedT);
-                    spawnedDisplay.setPersistent(false);
-                    spawnedDisplay.getPersistentDataContainer().set(DISPLAY_PLAYER_KEY, PersistentDataType.STRING, player.getUniqueId().toString());
-                    spawnedDisplay.getPersistentDataContainer().set(DISPLAY_MARKER_KEY, PersistentDataType.STRING, marker.id());
-                    spawnedDisplay.setTeleportDuration(0);
-                    player.showEntity(plugin, spawnedDisplay);
-                    waypoints.computeIfAbsent(player.getUniqueId(), k -> new ConcurrentHashMap<>()).put(marker.id(), spawnedDisplay);
-                    
-                    // Spawn new TextDisplay
-                    Location spawnedTextLoc = getBillboardLocation(player, target, 48);
-                    spawnedTextLoc.setY(player.getEyeLocation().getY() + getDeterministicYOffset(marker.id()));
-                    TextDisplay spawnedTextDisplay = (TextDisplay) player.getWorld().spawnEntity(spawnedTextLoc, EntityType.TEXT_DISPLAY);
-                    spawnedTextDisplay.setBillboard(Display.Billboard.CENTER);
-                    spawnedTextDisplay.setSeeThrough(true);
-                    spawnedTextDisplay.setPersistent(false);
-                    spawnedTextDisplay.setTeleportDuration(0);
-                    spawnedTextDisplay.setViewRange(128);
-                    spawnedTextDisplay.setBrightness(new Display.Brightness(15, 15));
-                    double spawnedInitialDist = player.getLocation().distance(target);
-                    float spawnedInitialScale = (float)Math.min(8.0, Math.max(1.0, spawnedInitialDist/24.0));
-                    spawnedTextDisplay.setTransformation(new Transformation(spawnedTextDisplay.getTransformation().getTranslation(), new org.joml.Quaternionf(), new org.joml.Vector3f(spawnedInitialScale, spawnedInitialScale, spawnedInitialScale), new org.joml.Quaternionf()));
-                    spawnedTextDisplay.getPersistentDataContainer().set(DISPLAY_PLAYER_KEY, PersistentDataType.STRING, player.getUniqueId().toString());
-                    spawnedTextDisplay.getPersistentDataContainer().set(DISPLAY_MARKER_KEY, PersistentDataType.STRING, marker.id());
-                    TextColor spawnedInitialColor = NamedTextColor.GREEN;
-                    if (marker.groupId().equalsIgnoreCase("banner-markers")) {
-                        String colorName = marker.color() != null ? marker.color().toUpperCase() : "GREEN";
-                        spawnedInitialColor = DYE_TO_NAMED.getOrDefault(colorName, NamedTextColor.GREEN);
-                    }
-                    double spawnedDist = player.getLocation().distance(target);
-                    Component spawnedText = Component.text(marker.name() + " (" + Math.round(spawnedDist) + "m)", spawnedInitialColor);
-                    spawnedTextDisplay.text(spawnedText);
-                    player.showEntity(plugin, spawnedTextDisplay);
-                    textDisplays.computeIfAbsent(player.getUniqueId(), k -> new ConcurrentHashMap<>()).put(marker.id(), spawnedTextDisplay);
-                    updateWaypointDisplays(player, target, marker.name(), marker.groupId(), marker.id(), spawnedDisplay, spawnedTextDisplay, marker.color());
-                });
+                }
+                BlockDisplay spawnedDisplay = (BlockDisplay) player.getWorld().spawnEntity(getBillboardLocation(player, target, 48), EntityType.BLOCK_DISPLAY);
+                spawnedDisplay.setBlock(Bukkit.createBlockData(spawnedBlockMaterial));
+                spawnedDisplay.setBrightness(new Display.Brightness(15, 15));
+                Transformation spawnedT = spawnedDisplay.getTransformation();
+                spawnedT.getScale().set(0.15f, (float) (500 - (-64)), 0.15f);
+                spawnedDisplay.setTransformation(spawnedT);
+                spawnedDisplay.setPersistent(false);
+                spawnedDisplay.getPersistentDataContainer().set(DISPLAY_PLAYER_KEY, PersistentDataType.STRING, player.getUniqueId().toString());
+                spawnedDisplay.getPersistentDataContainer().set(DISPLAY_MARKER_KEY, PersistentDataType.STRING, marker.id());
+                spawnedDisplay.setTeleportDuration(0);
+                player.showEntity(plugin, spawnedDisplay);
+                waypoints.computeIfAbsent(player.getUniqueId(), k -> new ConcurrentHashMap<>()).put(marker.id(), spawnedDisplay);
+                
+                // Spawn new TextDisplay
+                Location spawnedTextLoc = getBillboardLocation(player, target, 48);
+                spawnedTextLoc.setY(player.getEyeLocation().getY() + getDeterministicYOffset(marker.id()));
+                TextDisplay spawnedTextDisplay = (TextDisplay) player.getWorld().spawnEntity(spawnedTextLoc, EntityType.TEXT_DISPLAY);
+                spawnedTextDisplay.setBillboard(Display.Billboard.CENTER);
+                spawnedTextDisplay.setSeeThrough(true);
+                spawnedTextDisplay.setPersistent(false);
+                spawnedTextDisplay.setTeleportDuration(0);
+                spawnedTextDisplay.setViewRange(128);
+                spawnedTextDisplay.setBrightness(new Display.Brightness(15, 15));
+                double spawnedInitialDist = player.getLocation().distance(target);
+                float spawnedInitialScale = (float)Math.min(8.0, Math.max(1.0, spawnedInitialDist/24.0));
+                spawnedTextDisplay.setTransformation(new Transformation(spawnedTextDisplay.getTransformation().getTranslation(), new org.joml.Quaternionf(), new org.joml.Vector3f(spawnedInitialScale, spawnedInitialScale, spawnedInitialScale), new org.joml.Quaternionf()));
+                spawnedTextDisplay.getPersistentDataContainer().set(DISPLAY_PLAYER_KEY, PersistentDataType.STRING, player.getUniqueId().toString());
+                spawnedTextDisplay.getPersistentDataContainer().set(DISPLAY_MARKER_KEY, PersistentDataType.STRING, marker.id());
+                ChatColor spawnedInitialColor = ChatColor.GREEN;
+                if (marker.groupId().equalsIgnoreCase("banner-markers")) {
+                    String colorName = marker.color() != null ? marker.color().toUpperCase() : "GREEN";
+                    spawnedInitialColor = DYE_TO_NAMED.getOrDefault(colorName, ChatColor.GREEN);
+                }
+                double spawnedDist = player.getLocation().distance(target);
+                // Use standard Bukkit string API for TextDisplay
+                spawnedTextDisplay.setText(spawnedInitialColor + marker.name() + " (" + Math.round(spawnedDist) + "m)");
+                player.showEntity(plugin, spawnedTextDisplay);
+                textDisplays.computeIfAbsent(player.getUniqueId(), k -> new ConcurrentHashMap<>()).put(marker.id(), spawnedTextDisplay);
+                updateWaypointDisplays(player, target, marker.name(), marker.groupId(), marker.id(), spawnedDisplay, spawnedTextDisplay, marker.color());
                 return;
             }
             // Add null check before updating displays
@@ -230,8 +223,8 @@ public class WaypointManager {
         Map<String, BlockDisplay> playerDisplays = waypoints.get(player.getUniqueId());
         if (playerDisplays != null) {
             BlockDisplay display = playerDisplays.remove(markerId);
-        if (display != null && !display.isDead()) {
-            BlueMapCompass.foliaLib.getScheduler().runAtEntity(display, removeTask -> display.remove());
+            if (display != null && !display.isDead()) {
+                display.remove();
                 if (fun.mntale.blueMapCompass.BlueMapCompass.debug) {
                     Bukkit.getLogger().warning("[BlueMapCompass] BlockDisplay removed for player: " + player.getName());
                 }
@@ -242,7 +235,7 @@ public class WaypointManager {
         if (playerTextDisplays != null) {
             TextDisplay textDisplay = playerTextDisplays.remove(markerId);
             if (textDisplay != null && !textDisplay.isDead()) {
-                BlueMapCompass.foliaLib.getScheduler().runAtEntity(textDisplay, removeTask -> textDisplay.remove());
+                textDisplay.remove();
                 if (fun.mntale.blueMapCompass.BlueMapCompass.debug) {
                     Bukkit.getLogger().warning("[BlueMapCompass] TextDisplay removed for player: " + player.getName());
                 }
@@ -291,57 +284,51 @@ public class WaypointManager {
         if (distance > 48) {
             Location newLoc = getBillboardLocation(player, target, 48);
             newLoc.setY(player.getEyeLocation().getY() + getDeterministicYOffset(markerIdFinal));
-            BlueMapCompass.foliaLib.getScheduler().runAtEntity(display, tpTask -> {
-                display.setTeleportDuration(durationTicks);
-                display.setInterpolationDuration(durationTicks);
-                display.teleportAsync(newLoc);
-            });
-            BlueMapCompass.foliaLib.getScheduler().runAtEntity(textDisplay, td -> {
-                textDisplay.setTeleportDuration(durationTicks);
-                textDisplay.setInterpolationDuration(durationTicks);
-                textDisplay.teleportAsync(newLoc);
-                Transformation t = textDisplay.getTransformation();
-                t.getScale().set(scale, scale, scale);
-                textDisplay.setTransformation(t);
-                // Update text and color
-                TextColor color = NamedTextColor.GREEN;
-                if (markerGroupId.equalsIgnoreCase("banner-markers") && colorName != null) {
-                    String hex = BANNER_TO_HEX.getOrDefault(colorName.toLowerCase(), "#00FF00");
-                    try {
-                        color = TextColor.fromHexString(hex);
-                    } catch (Exception ignored) {}
-                }
-                double distNow = player.getLocation().distance(target);
-                Component newText = Component.text(markerName + " (" + Math.round(distNow) + "m)", color);
-                textDisplay.text(newText);
-            });
+            display.setTeleportDuration(durationTicks);
+            display.setInterpolationDuration(durationTicks);
+            display.teleport(newLoc);
+            
+            textDisplay.setTeleportDuration(durationTicks);
+            textDisplay.setInterpolationDuration(durationTicks);
+            textDisplay.teleport(newLoc);
+            Transformation t = textDisplay.getTransformation();
+            t.getScale().set(scale, scale, scale);
+            textDisplay.setTransformation(t);
+            // Update text and color
+            net.md_5.bungee.api.ChatColor color = net.md_5.bungee.api.ChatColor.GREEN;
+            if (markerGroupId.equalsIgnoreCase("banner-markers") && colorName != null) {
+                String hex = BANNER_TO_HEX.getOrDefault(colorName.toLowerCase(), "#00FF00");
+                try {
+                    color = net.md_5.bungee.api.ChatColor.of(hex);
+                } catch (Exception ignored) {}
+            }
+            double distNow = player.getLocation().distance(target);
+            String newText = color + markerName + " (" + Math.round(distNow) + "m)";
+            textDisplay.setText(newText);
         } else {
-            BlueMapCompass.foliaLib.getScheduler().runAtEntity(display, tpTask -> {
-                display.setTeleportDuration(durationTicks);
-                display.setInterpolationDuration(durationTicks);
-                display.teleportAsync(target);
-            });
+            display.setTeleportDuration(durationTicks);
+            display.setInterpolationDuration(durationTicks);
+            display.teleport(target);
+            
             Location textTarget = target.clone();
             textTarget.setY(player.getEyeLocation().getY() + getDeterministicYOffset(markerIdFinal));
-            BlueMapCompass.foliaLib.getScheduler().runAtEntity(textDisplay, td -> {
-                textDisplay.setTeleportDuration(durationTicks);
-                textDisplay.setInterpolationDuration(durationTicks);
-                textDisplay.teleportAsync(textTarget);
-                Transformation t = textDisplay.getTransformation();
-                t.getScale().set(scale, scale, scale);
-                textDisplay.setTransformation(t);
-                // Update text and color
-                TextColor color = NamedTextColor.GREEN;
-                if (markerGroupId.equalsIgnoreCase("banner-markers") && colorName != null) {
-                    String hex = BANNER_TO_HEX.getOrDefault(colorName.toLowerCase(), "#00FF00");
-                    try {
-                        color = TextColor.fromHexString(hex);
-                    } catch (Exception ignored) {}
-                }
-                double distNow = player.getLocation().distance(target);
-                Component newText = Component.text(markerName + " (" + Math.round(distNow) + "m)", color);
-                textDisplay.text(newText);
-            });
+            textDisplay.setTeleportDuration(durationTicks);
+            textDisplay.setInterpolationDuration(durationTicks);
+            textDisplay.teleport(textTarget);
+            Transformation t = textDisplay.getTransformation();
+            t.getScale().set(scale, scale, scale);
+            textDisplay.setTransformation(t);
+            // Update text and color
+            net.md_5.bungee.api.ChatColor color = net.md_5.bungee.api.ChatColor.GREEN;
+            if (markerGroupId.equalsIgnoreCase("banner-markers") && colorName != null) {
+                String hex = BANNER_TO_HEX.getOrDefault(colorName.toLowerCase(), "#00FF00");
+                try {
+                    color = net.md_5.bungee.api.ChatColor.of(hex);
+                } catch (Exception ignored) {}
+            }
+            double distNow = player.getLocation().distance(target);
+            String newText = color + markerName + " (" + Math.round(distNow) + "m)";
+            textDisplay.setText(newText);
         }
     }
 
@@ -357,13 +344,13 @@ public class WaypointManager {
             for (Entity entity : world.getEntitiesByClass(BlockDisplay.class)) {
                 String playerId = entity.getPersistentDataContainer().get(DISPLAY_PLAYER_KEY, PersistentDataType.STRING);
                 if (playerId != null && playerId.equals(uuid.toString())) {
-                    BlueMapCompass.foliaLib.getScheduler().runAtEntity(entity, t -> entity.remove());
+                    entity.remove();
                 }
             }
             for (Entity entity : world.getEntitiesByClass(TextDisplay.class)) {
                 String playerId = entity.getPersistentDataContainer().get(DISPLAY_PLAYER_KEY, PersistentDataType.STRING);
                 if (playerId != null && playerId.equals(uuid.toString())) {
-                    BlueMapCompass.foliaLib.getScheduler().runAtEntity(entity, t -> entity.remove());
+                    entity.remove();
                 }
             }
         }

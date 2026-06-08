@@ -14,8 +14,6 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.Location;
 import org.bukkit.World;
 
-import com.tcoded.folialib.FoliaLib;
-
 import java.util.Set;
 import java.util.List;
 import java.util.UUID;
@@ -23,7 +21,6 @@ import java.util.UUID;
 public final class BlueMapCompass extends JavaPlugin implements Listener {
 
     public static BlueMapCompass instance;
-    public static FoliaLib foliaLib;
     public BannerMarkerStorage bannerMarkerStorage;
     public BannerMarkerListener bannerMarkerListener;
     public MarkerGUI markerGUI;
@@ -32,7 +29,6 @@ public final class BlueMapCompass extends JavaPlugin implements Listener {
     @Override
     public void onEnable() {
         instance = this;
-        foliaLib = new FoliaLib(this);
         BlueMapIntegration.initialize(instance);
         bannerMarkerStorage = new BannerMarkerStorage(this);
         bannerMarkerListener = new BannerMarkerListener();
@@ -86,20 +82,20 @@ public final class BlueMapCompass extends JavaPlugin implements Listener {
         }
         fun.mntale.blueMapCompass.WaypointManager.setTrackedMarkers(player, newTracked);
         // No display logic here; global task will handle display restoration
-        // Per-player display cleanup after join (delayed, Folia region task)
-        BlueMapCompass.foliaLib.getScheduler().runAtEntityLater(player, t -> {
+        // Per-player display cleanup after join
+        getServer().getScheduler().runTaskLater(this, () -> {
             UUID uuid = player.getUniqueId();
             for (org.bukkit.World world : getServer().getWorlds()) {
                 for (org.bukkit.entity.BlockDisplay entity : world.getEntitiesByClass(org.bukkit.entity.BlockDisplay.class)) {
                     String playerId = entity.getPersistentDataContainer().get(fun.mntale.blueMapCompass.WaypointManager.DISPLAY_PLAYER_KEY, org.bukkit.persistence.PersistentDataType.STRING);
                     if (playerId != null && playerId.equals(uuid.toString())) {
-                        BlueMapCompass.foliaLib.getScheduler().runAtEntity(entity, td -> entity.remove());
+                        entity.remove();
                     }
                 }
                 for (org.bukkit.entity.TextDisplay entity : world.getEntitiesByClass(org.bukkit.entity.TextDisplay.class)) {
                     String playerId = entity.getPersistentDataContainer().get(fun.mntale.blueMapCompass.WaypointManager.DISPLAY_PLAYER_KEY, org.bukkit.persistence.PersistentDataType.STRING);
                     if (playerId != null && playerId.equals(uuid.toString())) {
-                        BlueMapCompass.foliaLib.getScheduler().runAtEntity(entity, td -> entity.remove());
+                        entity.remove();
                     }
                 }
             }

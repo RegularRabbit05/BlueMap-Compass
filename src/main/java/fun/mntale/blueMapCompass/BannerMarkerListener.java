@@ -15,8 +15,6 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.inventory.ItemStack;
 import com.flowpowered.math.vector.Vector3d;
 import java.util.Optional;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.block.BlockPistonExtendEvent;
@@ -42,8 +40,7 @@ public class BannerMarkerListener implements Listener {
         if (fun.mntale.blueMapCompass.BlueMapCompass.debug) {
             org.bukkit.Bukkit.getLogger().info("[BlueMapCompass][DEBUG] Banner placed with custom name at " + block.getLocation());
         }
-        Component nameComponent = item.getItemMeta().displayName();
-        String name = PlainTextComponentSerializer.plainText().serialize(nameComponent);
+        String name = org.bukkit.ChatColor.stripColor(item.getItemMeta().getDisplayName());
         DyeColor color = banner.getBaseColor();
         Location loc = block.getLocation();
         String worldName = loc.getWorld().getName();
