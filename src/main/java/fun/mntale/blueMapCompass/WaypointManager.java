@@ -143,6 +143,7 @@ public class WaypointManager {
                     }
                 }
                 BlockDisplay spawnedDisplay = (BlockDisplay) player.getWorld().spawnEntity(getBillboardLocation(player, target, 48), EntityType.BLOCK_DISPLAY);
+                spawnedDisplay.setVisibleByDefault(false);
                 spawnedDisplay.setBlock(Bukkit.createBlockData(spawnedBlockMaterial));
                 spawnedDisplay.setBrightness(new Display.Brightness(15, 15));
                 Transformation spawnedT = spawnedDisplay.getTransformation();
@@ -159,6 +160,7 @@ public class WaypointManager {
                 Location spawnedTextLoc = getBillboardLocation(player, target, 48);
                 spawnedTextLoc.setY(player.getEyeLocation().getY() + getDeterministicYOffset(marker.id()));
                 TextDisplay spawnedTextDisplay = (TextDisplay) player.getWorld().spawnEntity(spawnedTextLoc, EntityType.TEXT_DISPLAY);
+                spawnedTextDisplay.setVisibleByDefault(false);
                 spawnedTextDisplay.setBillboard(Display.Billboard.CENTER);
                 spawnedTextDisplay.setSeeThrough(true);
                 spawnedTextDisplay.setPersistent(false);
